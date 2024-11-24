@@ -1,0 +1,22 @@
+{:paths ["src" "resources"]
+ :deps {org.clojure/clojure {:mvn/version "1.12.0"}
+        io.github.nextjournal/clerk {:mvn/version "0.17.1102"}
+        org.babashka/cli {:mvn/version "0.8.60"}
+        clj-http/clj-http {:mvn/version "3.13.0"}
+        org.clj-commons/hickory {:mvn/version "0.7.5"}
+        org.slf4j/slf4j-nop {:mvn/version "2.0.16"}
+        better-cond/better-cond {:mvn/version "2.1.5"}}
+
+ :aliases {:nextjournal/clerk {:exec-fn nextjournal.clerk/build!
+                               :jvm-opts ["-Dclojure.main.report=stdout"]
+                               :exec-args {:index "src/index.clj"
+                                           :compile-css true
+                                           :paths ["src/solutions/*/*.clj"]}
+                               :main-opts ["-m" "babashka.cli.exec"]}
+           :serve {:exec-fn nextjournal.clerk/serve!
+                   :exec-args {:index "src/index.clj"
+                               :watch-paths ["src"]
+                               :port 7777
+                               :compile-css true
+                               :paths ["src/solutions/*/*.clj"]}
+                   :main-opts ["-m" "babashka.cli.exec"]}}}
