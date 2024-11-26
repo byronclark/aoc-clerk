@@ -4,3 +4,5 @@
 .lsp/
 
 .envrc
+/node_modules/
+/public/
