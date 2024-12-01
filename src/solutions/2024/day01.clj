@@ -19,21 +19,22 @@
                 slurp
                 str/split-lines
                 (reduce (fn [[list-a list-b] line]
-                          (let [[loc-a loc-b] (str/split line #"\s+" 2)]
-                            [(conj list-a (parse-long loc-a))
-                             (conj list-b (parse-long loc-b))]))
+                          (let [locations (map parse-long (str/split line #"\s+" 2))]
+                            [(conj list-a (first locations))
+                             (conj list-b (second locations))]))
                         [[] []])))
-{:nextjournal.clerk/visibility {:code :show :result :show}}
-(mapv #(vec (take 5 %)) input)
 
+{:nextjournal.clerk/visibility {:code :show :result :show}}
+;; Trimmed input after parsing
+(mapv #(vec (take 5 %)) input)
 
 {:nextjournal.clerk/visibility {:code :show :result :hide}}
 ;; ## Part 1
+;;
+;; To find the difference, we sort the lists and then iterate finding the distance between
+;; each pair of elements.
 (defn part-1 [[list-a list-b]]
-  (reduce (fn [acc [a b]]
-                 (+ acc (abs (- a b))))
-          0
-          (zipmap (sort list-a) (sort list-b))))
+  (apply + (map #(abs (- %1 %2)) (sort list-a) (sort list-b))))
 
 ;; Which gives our answer
 {:nextjournal.clerk/visibility {:code :hide :result :show}}
@@ -41,11 +42,15 @@
 
 {:nextjournal.clerk/visibility {:code :show :result :hide}}
 ;; ## Part 2
-(defn part-2 [[list-a list-b]]
-  (let [occurs (frequencies list-b)]
-    (->> list-a
-         (map #(* % (get occurs % 0)))
-         (reduce + 0))))
+;;
+;; We'll use `frequencies` to find how often each location occurs in the right side and
+;; use it as a cache while checking each item in the left side.
+(defn part-2 [[left right]]
+  (let [occurs (frequencies right)]
+    (->> left
+         (keep #(when-let [c (get occurs %)]
+                  (* % c)))
+         (apply +))))
 
 ;; Which gives our answer
 {:nextjournal.clerk/visibility {:code :hide :result :show}}
