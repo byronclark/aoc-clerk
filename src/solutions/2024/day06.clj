@@ -103,6 +103,9 @@
 ;;
 ;; I was surprised to find both how long the paths were and how much slower the correct
 ;; solution was.
+;;
+;; It's still slow, but we have multiple cores so we can use `pmap` for a speedup without
+;; trying to make a more efficient algorithm.
 (defn part-2
   [lab]
   (let [start (start-position lab)
@@ -114,7 +117,7 @@
                  (-> (grid/set-at lab pos :obstruction)
                      (patrol start :up)
                      :loop?)))
-         (keep identity)
+         (filter true?)
          count)))
 
 ;; Which gives our answer
