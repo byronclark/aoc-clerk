@@ -56,7 +56,6 @@
            visited #{}]
       (b/cond
         :let [[position facing] current]
-
         (not (grid/valid-location? lab position))
         {:path path :loop? false}
 
@@ -64,16 +63,15 @@
         {:path path :loop? true}
 
         :let [position' (next-space position facing)]
-
         (= :obstruction (grid/at lab position'))
         (recur [position (next-facing facing)]
                path
-               (conj visited [position facing]))
+               (conj visited current))
 
         :else
         (recur [position' facing]
                (conj path position)
-               (conj visited [position facing]))))))
+               (conj visited current))))))
 
 (defn start-position
   [lab]
@@ -112,9 +110,11 @@
     (->> initial-path
          (drop 1)                       ;Can't start at the guard position
          set                            ;No duplicates
-         (filter (fn [pos]
-                   (let [with-obstruction (grid/set-at lab pos :obstruction)]
-                     (:loop? (patrol with-obstruction start :up)))))
+         (pmap (fn [pos]
+                 (-> (grid/set-at lab pos :obstruction)
+                     (patrol start :up)
+                     :loop?)))
+         (keep identity)
          count)))
 
 ;; Which gives our answer
