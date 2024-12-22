@@ -2,7 +2,8 @@
   "Build and operate on two dimensional grids."
   (:require
    [clojure.math.combinatorics :as combo]
-   [clojure.string :as str]))
+   [clojure.string :as str]
+   [solutions.2024.helpers.grid :as grid]))
 
 (defn char->digit
   [character]
@@ -77,6 +78,13 @@
   (if (valid-location? grid location)
     (apply update-in grid [:values (location->index grid location)] f args)
     grid))
+
+(defn adjacent-locations
+  "Valid locations either horizontally or vertically adjacent to location."
+  [grid location]
+  (let [[x y] location]
+    (->> [[(dec x) y] [x (dec y)] [(inc x) y] [x (inc y)]]
+         (filter #(grid/valid-location? grid %)))))
 
 (defn all-locations
   [grid]
