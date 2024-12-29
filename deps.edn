@@ -6,7 +6,9 @@
         org.clj-commons/hickory {:mvn/version "0.7.5"}
         org.slf4j/slf4j-nop {:mvn/version "2.0.16"}
         better-cond/better-cond {:mvn/version "2.1.5"}
-        org.clojure/math.combinatorics {:mvn/version "0.3.0"}}
+        org.clojure/math.combinatorics {:mvn/version "0.3.0"}
+        net.mikera/core.matrix {:mvn/version "0.63.0"}
+        net.mikera/vectorz-clj {:mvn/version "0.48.0"}}
 
  :aliases {:nextjournal/clerk {:exec-fn nextjournal.clerk/build!
                                :jvm-opts ["-Dclojure.main.report=stdout"]

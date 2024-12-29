@@ -6,11 +6,14 @@
    [util :as u]
    [nextjournal.clerk :as clerk]
    [clojure.string :as str]
+   [clojure.math.combinatorics :as combo]
    [better-cond.core :as bc]
-   [clojure.math.combinatorics :as combo]))
+   [clojure.core.matrix :as m]
+   [clojure.core.matrix.linear :as lin]))
 
 ;; # Problem
 {:nextjournal.clerk/visibility {:code :hide :result :show}}
+^::clerk/no-cache
 (clerk/html (u/load-problem "13" "2024"))
 {:nextjournal.clerk/visibility {:code :show :result :hide}}
 
@@ -65,8 +68,7 @@ Prize: X=18641, Y=10279"
 {:nextjournal.clerk/visibility {:code :show :result :hide}}
 ;; ## Part 1
 ;;
-;; First attempt was a recursive walk, but that wasn't nearly as efficient as I hoped. Given the constraint on how many times each button can be pushed, I think it's going to be enough to generate all the possible press combinations (* 100 100) and see if any of them match.
-
+;; First attempt was a recursive walk, but that wasn't nearly as efficient as I hoped.
 (defn- presses->location
   [{:keys [a b]} [presses-a presses-b]]
   (let [[a-x a-y] a
@@ -80,13 +82,23 @@ Prize: X=18641, Y=10279"
   [[presses-a presses-b]]
   (+ (* 3 presses-a) presses-b))
 
+;; To make this more efficient we really need to find a reasonable range to test.
+;;
+;; Finding the maximum number of pushes for each button is straightforward: find how many
+;; times we can push the button before it moves past in either direction. Finding the
+;; minimum number of presses is a bit more tricky because it really can be zero. The
+;; search space is small enough with the max-pushes limit for part 1 that we'll skip
+;; finding the minimum to start with.
 (defn- cost-to-win
   [max-pushes {:keys [a b prize] :as machine}]
   (let [[prize-x prize-y] prize
-        max-pushes-a (min max-pushes (quot prize-x (first a)) (quot prize-y (second a)))
-        max-pushes-b (min max-pushes (quot prize-x (first b)) (quot prize-y (second b)))
-        costs (->> (combo/cartesian-product (range (inc max-pushes-a))
-                                            (range (inc max-pushes-b)))
+        [a-x a-y] a
+        [b-x b-y] b
+        max-pushes-a (min (quot prize-x a-x) (quot prize-y a-y))
+        max-pushes-b (min (quot prize-x b-x) (quot prize-y b-y))
+
+        costs (->> (combo/cartesian-product (range (min max-pushes max-pushes-a))
+                                            (range (min max-pushes max-pushes-b)))
                    (filter #(let [[x y] (presses->location machine %)]
                               (and (= x prize-x)
                                    (= y prize-y))))
@@ -110,10 +122,95 @@ Prize: X=18641, Y=10279"
 
 {:nextjournal.clerk/visibility {:code :show :result :hide}}
 ;; ## Part 2
-(defn part-2
-  [input]
-  (println "Part 2"))
+;;
+;; There's no way we can iterate from 0 on this one. At least I'm not willing to wait for that.
+;;
+;; I'm going to try something a little different:
+;; 1. Find how many B presses it takes to get past the prize in any direction
+;; 2. Until we hit the prize or fall off the edge:
+;;    1. Remove a B press
+;;    2. Add an A press if possible
+;;    3. Win?
+;;
+;; But that doesn't work because it's still a massive number of iterations to try.
+(defn- cost-to-win-iterate-down
+  [{:keys [a b prize]}]
+  (let [[prize-x prize-y] prize
+        [a-x a-y] a
+        [b-x b-y] b
+        start-b (inc (min (quot prize-x b-x) (quot prize-y b-y)))]
+    (loop [presses-a 0
+           presses-b start-b]
+      (bc/cond
+        :let [x (+ (* presses-a a-x) (* presses-b b-x))
+              y (+ (* presses-a a-y) (* presses-b b-y))]
 
-;; Which gives our answer
+        (or (neg? x) (neg? y))
+        nil
+
+        (and (= x prize-x) (= y prize-y))
+        (cost [presses-a presses-b])
+
+        (or (>= x prize-x) (>= y prize-y))
+        (recur presses-a (dec presses-b))
+
+        :else
+        (recur (inc presses-a) presses-b)))))
+
+;; At this point it's probably time to return to basic math. We have two equations:
+;;
+;; $prize_x = n_a * a_x + n_b * b_x$
+;;
+;; $prize_y = n_a * a_y + n_b * b_y$
+;;
+;; Two equations, two unknowns.
+;;
+;; Let's assume there's only one solution for each and it's the lowest cost. 🤞
+(m/set-current-implementation :vectorz)
+
+;; We only care about integer solutions, but linear algebra libraries usually operate on
+;; floats so we get to check for almost integers.
+;;
+;; To be fair, it's probably overkill to use a full library for solving a simple set of
+;; equations like this, but I'm hopeful it'll be useful in other days.
+(defn- integer-solution?
+  "Returns true if all elements are close enough to an integers"
+  [a & {:keys [epsilon] :or {epsilon 1e-3}}]
+  (-> a
+      m/round
+      (m/sub a)
+      m/abs
+      (m/lt epsilon)
+      m/zero-count
+      zero?))
+
+(defn- cost-to-win-solve
+  [{:keys [a b prize]}]
+  (let [[prize-x prize-y] prize
+        [a-x a-y] a
+        [b-x b-y] b
+        solution (lin/solve [[a-x b-x]
+                             [a-y b-y]]
+                            [prize-x prize-y])]
+    (when (integer-solution? solution)
+      (->> solution
+           m/round
+           (map long)
+           cost))))
+
+(defn- update-prize-location [n machine]
+  (update machine :prize #(map (partial + n) %)))
+
+(defn part-2
+  [machines]
+  (->> machines
+       (map (partial update-prize-location 10000000000000))
+       (keep cost-to-win-solve)
+       (apply +)))
+
+;; Which gives our answer with the test input
 {:nextjournal.clerk/visibility {:code :hide :result :show}}
+(part-2 test-input)
+
+;; And the full input
 (part-2 input)
