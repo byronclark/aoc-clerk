@@ -13,7 +13,6 @@
 
 ;; # Problem
 {:nextjournal.clerk/visibility {:code :hide :result :show}}
-^::clerk/no-cache
 (clerk/html (u/load-problem "13" "2024"))
 {:nextjournal.clerk/visibility {:code :show :result :hide}}
 
