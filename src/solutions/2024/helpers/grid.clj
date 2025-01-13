@@ -90,3 +90,7 @@
   [grid]
   (combo/cartesian-product (range (:width grid))
                            (range (:height grid))))
+
+(defn find-value
+  [grid value]
+  (filter #(= value (at grid %)) (all-locations grid)))
