@@ -61,7 +61,7 @@
     :down [x (inc y)]
     :left [(dec x) y]))
 
-;; Build out all the valid connections from a single location
+;; Build out all the valid connections from a single location along with our cost.
 (defn- connections
   [maze location]
   (let [turns {:up [:left :right]
@@ -94,6 +94,9 @@
           {}
           (grid/all-locations maze)))
 
+;; And now we get to A* which we can build somewhat generically for when we need it again
+;; later. But we don't have a heuristic so it's really Dijkstra's algorithm with a fancy
+;; coat of paint.
 (defn a*
   [graph start-location {:keys [target-fn cost-fn done?-fn]}]
   (let [MAX-VALUE (Long/MAX_VALUE)]
@@ -120,6 +123,8 @@
         :else
         (recur open-set' g-scores')))))
 
+;; Most of the callback/helper functions here are so that I don't have to worry about
+;; building different shapes of the data to figure out cost of each move and target moves.
 (defn part-1
   [maze]
   (let [graph (->graph maze)
