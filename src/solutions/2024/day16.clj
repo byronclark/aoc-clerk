@@ -7,6 +7,7 @@
    [clojure.set :as set]
    [nextjournal.clerk :as clerk]
    [solutions.2024.helpers.grid :as grid]
+   [solutions.2024.helpers.pathfinding :refer [a* a*-with-path]]
    [util :as u]))
 
 ;; # Problem
@@ -113,46 +114,17 @@
           {}
           (grid/all-locations maze)))
 
-;; And now we get to A* which we can build somewhat generically for when we need it again
-;; later. But we don't have a heuristic so it's really Dijkstra's algorithm with a fancy
-;; coat of paint.
-(defn a*
-  [graph start-location {:keys [target-fn cost-fn done?-fn]}]
-  (let [MAX-VALUE Long/MAX_VALUE]
-    (loop [open-set #{start-location}
-           g-scores {start-location 0}]
-      (bc/cond
-        (empty? open-set) ;no path available
-        nil
-
-        :let [current (apply min-key #(get g-scores % MAX-VALUE) open-set)
-              current-g-score (get g-scores current)]
-        (done?-fn current)
-        current-g-score
-
-        :let [[open-set' g-scores']
-              (reduce (fn [[open-set g-scores] connection]
-                        (let [target (target-fn connection)
-                              test-g-score (+ current-g-score (cost-fn connection))]
-                          (if (< test-g-score (get g-scores target MAX-VALUE))
-                            [(conj open-set target) (assoc g-scores target test-g-score)]
-                            [open-set g-scores])))
-                      [(disj open-set current) g-scores]
-                      (get graph current))]
-        :else
-        (recur open-set' g-scores')))))
-
-;; Most of the callback/helper functions here are so that I don't have to worry about
-;; building different shapes of the data to figure out cost of each move and target moves.
+;; A* extracted to a helper namespace for day 18.
 (defn part-1
   [maze]
   (let [graph (->graph maze)
         start-location {:point (first (grid/find-value maze :start))
                         :direction :right}
         target-location (first (grid/find-value maze :end))]
-    (a* graph start-location {:target-fn #(select-keys % [:direction :point])
-                              :cost-fn :cost
-                              :done?-fn #(= (:point %) target-location)})))
+    [(a* start-location {:connections-fn #(get graph %)
+                         :target-fn #(select-keys % [:direction :point])
+                         :cost-fn :cost
+                         :done?-fn #(= (:point %) target-location)})]))
 
 ;; Which gives our answer for the test input
 {:nextjournal.clerk/visibility {:code :hide :result :show}}
@@ -170,66 +142,21 @@
 ;; It's almost like this part was designed to make using A* difficult because we now want
 ;; *all* the paths with the same cost. But I think we can make this work.
 
-;; We'll start with A* but we need to store the path that got to each $g(n)$. Unlike our
-;; original implementation we'll need to handle equal cost differently. Instead of
-;; replacing the paths to that point, we'll collect the new paths and keep the existing
-;; ones.
-(defn a*-with-path
-  [graph start-location {:keys [target-fn cost-fn done?-fn]}]
-  (let [MAX-VALUE Long/MAX_VALUE]
-    (loop [open-set #{start-location}
-           paths {start-location #{[start-location]}}
-           g-scores {start-location 0}]
-      (bc/cond
-        (empty? open-set) ;no path available
-        nil
-
-        :let [current (apply min-key #(get g-scores % MAX-VALUE) open-set)
-              current-g-score (get g-scores current)
-              current-paths (get paths current)]
-        (done?-fn current)
-        current-paths
-
-        :let [[open-set' paths' g-scores']
-              (reduce (fn [[open-set paths g-scores] connection]
-                        (let [target (target-fn connection)
-                              target-g-score (get g-scores target)
-                              test-g-score (+ current-g-score (cost-fn connection))
-                              target-paths (set (map #(conj % target) current-paths))]
-                          (cond
-                            ;; Better path than we've found so far
-                            (or (nil? target-g-score)
-                                (< test-g-score target-g-score))
-                            [(conj open-set target)
-                             (assoc paths target target-paths)
-                             (assoc g-scores target test-g-score)]
-
-                            ;; Equivalent path
-                            (= test-g-score target-g-score)
-                            [(conj open-set target)
-                             (update paths target (fnil set/union #{}) target-paths)
-                             (assoc g-scores target test-g-score)]
-
-                            :else
-                            [open-set paths g-scores])))
-                      [(disj open-set current) paths g-scores]
-                      (get graph current))]
-        :else
-        (recur open-set' paths' g-scores')))))
-
+;; A* with path moved to helper namespace with day 18.
 (defn part-2
   [maze]
   (let [graph (->graph maze)
         start-location {:point (first (grid/find-value maze :start))
                         :direction :right}
         target-location (first (grid/find-value maze :end))
-        paths (a*-with-path graph start-location {:target-fn #(select-keys % [:direction :point])
-                                                  :cost-fn :cost
-                                                  :done?-fn #(= (:point %) target-location)})]
-    (->> paths
-         (mapcat (fn [path] (map :point path)))
-         set
-         count)))
+        paths (a*-with-path start-location {:connections-fn #(get graph %)
+                                            :target-fn #(select-keys % [:direction :point])
+                                            :cost-fn :cost
+                                            :done?-fn #(= (:point %) target-location)})]
+    [(->> paths
+          (mapcat (fn [path] (map :point path)))
+          set
+          count)]))
 
 ;; Which gives our answer with the small test input
 {:nextjournal.clerk/visibility {:code :hide :result :show}}
