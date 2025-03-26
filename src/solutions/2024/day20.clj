@@ -73,8 +73,7 @@
          (filter (fn [[wall landing]]
                    (and (= :wall (space-class racetrack wall))
                         (= :floor (space-class racetrack landing)))))
-         (map (fn [[_ landing]]
-                {:destination landing :cost 2})))))
+         (map (fn [[_ landing]] landing)))))
 
 ;; For comparison and path finding we need to collect all the routes in the map.
 (defn ->graph
@@ -83,11 +82,9 @@
                      (filter #(= :floor (space-class racetrack %))
                              (grid/adjacent-locations racetrack from)))]
     (->> (grid/all-locations racetrack)
-         (remove #(= :wall %))
+         (remove #(= :wall (grid/at racetrack %)))
          (map (fn [location]
-                [location (->> location
-                               floor-from
-                               (map (fn [dest-location] {:destination dest-location :cost 1})))]))
+                [location (floor-from location)]))
          (into {}))))
 
 ;; My first attempt was to apply each cheat to the map and see how long the
@@ -104,15 +101,15 @@
   [racetrack min-savings]
   (let [start-location (first (grid/find-value racetrack :start))
         end-location (first (grid/find-value racetrack :end))
-        base-track-graph (->graph racetrack)
+        track-graph (->graph racetrack)
         possible-cheats (->> (grid/find-value racetrack :floor)
                              (concat [start-location])
                              (map #(vec [% (find-cheats-at racetrack %)]))
                              (into {}))
         shortest-path (first (a*-with-path start-location
-                                           {:connections-fn #(get base-track-graph %)
-                                            :target-fn :destination
-                                            :cost-fn :cost
+                                           {:connections-fn #(get track-graph %)
+                                            :target-fn identity
+                                            :cost-fn (constantly 1)
                                             :done?-fn #(= % end-location)}))
         path-location-index (->> shortest-path
                                  (map-indexed #(vector %2 %1))
@@ -120,7 +117,7 @@
     (->> (for [[cheat-start cheats] possible-cheats
                :let [start-index (get path-location-index cheat-start)]
                cheat cheats
-               :let [end-index (get path-location-index (:destination cheat))]]
+               :let [end-index (get path-location-index cheat)]]
            ;; The amount saved is the number of indexes between the two locations
            (- (dec end-index) (inc start-index)))
          (filter #(>= % min-savings))
@@ -136,10 +133,53 @@
 
 {:nextjournal.clerk/visibility {:code :show :result :hide}}
 ;; ## Part 2
-(defn part-2
-  [input]
-  (println "Part 2"))
+;;
+;; For part two we need to look at each combination of start and end on the path
+;; that would save at least a certain amount and see if there's a path of <=20
+;; ~wall~ spaces that joins them together.
+;;
+;; Since we don't have to care about the type of space, the length of a cheat is
+;; the Manhattan distance between start and end.
+(defn manhattan-distance
+  [[x-1 y-1] [x-2 y-2]]
+  (+ (abs (- y-2 y-1))
+     (abs (- x-2 x-1))))
 
-;; Which gives our answer
+(defn part-2
+  [racetrack min-savings]
+  (let [max-cheat-time 20
+        start-location (first (grid/find-value racetrack :start))
+        end-location (first (grid/find-value racetrack :end))
+        track-graph (->graph racetrack)
+        shortest-path (vec (first (a*-with-path start-location
+                                                {:connections-fn #(get track-graph %)
+                                                 :target-fn identity
+                                                 :cost-fn (constantly 1)
+                                                 :done?-fn #(= % end-location)})))
+        path-location-index (->> shortest-path
+                                 (map-indexed #(vector %2 %1))
+                                 (into {}))
+        min-path-spacing (+ min-savings 2) ;minimum cheat takes 2 picoseconds
+        possible-cheats (map (fn [start-index]
+                               [(shortest-path start-index)
+                                (subvec shortest-path (+ start-index min-path-spacing))])
+                             (range (- (count shortest-path) min-path-spacing)))]
+    (->> (for [[cheat-start cheats] possible-cheats
+               :let [cheat-start-index (get path-location-index cheat-start)]
+               cheat-end cheats
+               :let [cheat-length (manhattan-distance cheat-start cheat-end)]
+               :when (<= cheat-length max-cheat-time)
+               :let [cheat-skips (- (get path-location-index cheat-end)
+                                    cheat-start-index)]]
+           ;; The time saved is the difference between how long the original path took and the time the cheat took.
+           (- cheat-skips cheat-length))
+         (filter #(>= % min-savings))
+         count)))
+
+;; Which gives our answer for the test input using 50 as the minimum savings because there aren't any that save 100.
+;; We expect 285 here.
 {:nextjournal.clerk/visibility {:code :hide :result :show}}
-(part-2 input)
+(part-2 test-input 50)
+
+;; And the full input
+(part-2 input 100)
