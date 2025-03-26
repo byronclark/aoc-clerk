@@ -82,14 +82,12 @@ bbrgwb"))
                   found
 
                   :else
-                  (do
-                    (let [builds (->> towels
-                                      (keep (fn [towel] (when (str/starts-with? p towel)
-
-                                                          (inner (subs p (count towel))))))
-                                      (apply +))]
-                      (swap! memory assoc p builds)
-                      builds))))]
+                  (let [builds (->> towels
+                                    (keep (fn [towel] (when (str/starts-with? p towel)
+                                                        (inner (subs p (count towel))))))
+                                    (apply +))]
+                    (swap! memory assoc p builds)
+                    builds)))]
     (inner pattern)))
 
 (defn part-2
