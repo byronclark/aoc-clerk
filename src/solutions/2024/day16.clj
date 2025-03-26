@@ -2,9 +2,7 @@
 (ns solutions.2024.day16
   {:nextjournal.clerk/toc true}
   (:require
-   [better-cond.core :as bc]
    [clojure.java.io :as io]
-   [clojure.set :as set]
    [nextjournal.clerk :as clerk]
    [solutions.2024.helpers.grid :as grid]
    [solutions.2024.helpers.pathfinding :refer [a* a*-with-path]]
@@ -121,10 +119,10 @@
         start-location {:point (first (grid/find-value maze :start))
                         :direction :right}
         target-location (first (grid/find-value maze :end))]
-    [(a* start-location {:connections-fn #(get graph %)
-                         :target-fn #(select-keys % [:direction :point])
-                         :cost-fn :cost
-                         :done?-fn #(= (:point %) target-location)})]))
+    (a* start-location {:connections-fn #(get graph %)
+                        :target-fn #(select-keys % [:direction :point])
+                        :cost-fn :cost
+                        :done?-fn #(= (:point %) target-location)})))
 
 ;; Which gives our answer for the test input
 {:nextjournal.clerk/visibility {:code :hide :result :show}}
@@ -153,10 +151,10 @@
                                             :target-fn #(select-keys % [:direction :point])
                                             :cost-fn :cost
                                             :done?-fn #(= (:point %) target-location)})]
-    [(->> paths
-          (mapcat (fn [path] (map :point path)))
-          set
-          count)]))
+    (->> paths
+         (mapcat (fn [path] (map :point path)))
+         set
+         count)))
 
 ;; Which gives our answer with the small test input
 {:nextjournal.clerk/visibility {:code :hide :result :show}}
