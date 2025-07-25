@@ -5,8 +5,8 @@
    [clojure.java.io :as io]
    [clojure.math.combinatorics :as combo]
    [clojure.string :as str]
+   [medley.core :refer [partition-after]]
    [nextjournal.clerk :as clerk]
-   [solutions.2024.helpers.pathfinding :refer [a*-with-path]]
    [util :as u]))
 
 ;; # Problem
@@ -66,7 +66,9 @@
 ;; That was tedious... I really don't want to do this by hand for the full
 ;; 10-key pad.
 ;;
-;; Time to build a graph and break out our pathfinding algorithm. But then I discovered that my version of A* with the path isn't exhaustive 🤦. This is small enough that we can be inefficient.
+;; Time to build a graph and break out our pathfinding algorithm. But then I
+;; discovered that my version of A* with the path isn't exhaustive 🤦. This is
+;; small enough that we can be inefficient.
 (def connections-10key
   {\0     [{:target \2 :direction :up}
            {:target :enter :direction :right}]
@@ -136,7 +138,6 @@
 ;; Now that I've written that, I think we have a different problem to solve.
 ;; This is pathfinding repeated multiple times *if* we can still assume shortest
 ;; path on one layer will lead to shortest path on the next. Lets find out.
-
 (defn shortest
   "Given a seq of routes, return all of the shortest by length."
   [routes]
@@ -157,7 +158,7 @@
   (->> steps
        (partition 2 1)
        (reduce (fn [found-paths [start end]]
-                 (let [next-paths (routes paths start end)]
+                 (let [next-paths (shortest (routes paths start end))]
                    (for [path (if (seq found-paths) found-paths [[]])
                          next-path next-paths]
                      (concat path next-path [:enter]))))
@@ -226,10 +227,89 @@
 
 {:nextjournal.clerk/visibility {:code :show :result :hide}}
 ;; ## Part 2
-(defn part-2
-  [input]
-  (println "Part 2"))
+;;
+;; I was so excited about my hack to only count the length of the path on the
+;; last step in part 1. And now it won't work at all since we have 25 layers and
+;; it's going to be horrifically long.
+;;
+;; My first guess is that we can store shortest known sequences for each section
+;; of a path.
+;;
+;; More likely I'm overthinking this and there's some massive simplification we
+;; can take.
+;;
+;; Looking back at part 1 the most painful part is that the number of paths to
+;; check grew with each round of robots *and* got bigger with each check.
+;;
+;; The key simplification here is that we always start and end on :enter to
+;; press a key below. So once we have a sequence we can split on :enter and then
+;; find the shortest path on the next level up for each of those segments.
 
-;; Which gives our answer
+(defn paths-d-pad-with-enter
+  "Get all possible paths `from`->`to` and add the implied enter on each."
+  [[from to]]
+  (->> (get-in paths-d-pad [from to] [[]])
+       (map #(conj % :enter))))
+
+(defn possible-paths-for-sequence
+  "Generates all possible paths to traverse the sequence."
+  [sequence]
+  (->> sequence
+       (partition 2 1)
+       (map paths-d-pad-with-enter)
+       (apply combo/cartesian-product)
+       (map flatten)))
+
+;; With those pieces in place the algorithm isn't *too* bad but the simple
+;; version requires serious caching so that we don't spend years recalculating
+;; the same data.
+(def shortest-path-at-level
+  "Return the length of the shortest path to move (starting from enter) through all the keys in sequence on level."
+  (memoize (fn [level sequence]
+             {:pre [(= :enter (last sequence))]}
+             (if (zero? level)
+               (count sequence)
+               (let [possible-paths (possible-paths-for-sequence (cons :enter sequence))]
+                 (->> possible-paths
+                      (map (fn [path]
+                             (->> path
+                                  (partition-after #(= :enter %))
+                                  (map (partial shortest-path-at-level (dec level)))
+                                  (apply +))))
+                      (apply min)))))))
+
+(defn enter-code-at-depth
+  "Calculate the number of keypresses to enter code on a numeric keypad behind depth d-pads."
+  [code depth]
+  (let [shortest-numeric (->> code
+                              (cons :enter)
+                              (walks paths-10key)
+                              shortest)]
+    (->> shortest-numeric
+         (map (partial shortest-path-at-level depth))
+         (apply min))))
+
+{:nextjournal.clerk/visibility {:code :show :result :show}}
+;; Let's compare to Part 1 to see if we're even close
+(enter-code (parse-code "980A"))
+(enter-code-at-depth (parse-code "980A") 2)
+
+{:nextjournal.clerk/visibility {:code :show :result :hide}}
+(defn part-2
+  [codes]
+  (->> codes
+       (map (fn [code]
+              (* (enter-code-at-depth code 25)
+                 (code->long code))))
+       (apply +)))
+
+;; Which gives our answer with the test input
 {:nextjournal.clerk/visibility {:code :hide :result :show}}
+(part-2 [(parse-code "029A")
+         (parse-code "980A")
+         (parse-code "179A")
+         (parse-code "456A")
+         (parse-code "379A")])
+
+;; And the full set of codes
 (part-2 input)
