@@ -112,15 +112,59 @@ td-yn"))
 ;; didn't spend too much time optimizing part 1 since this feels like a very
 ;; different problem.
 ;;
+;; We need a general "add one" step where we see if there are any unused
+;; computers that connect to all of the computers in the group we've already
+;; selected.
 ;;
+;; The add-one method works and gets the correct answer but it takes almost two
+;; minutes to run on my laptop. I'm sure we can do better.
+(defn add-one
+  [connections computers]
+  (keep (fn [other]
+          (when (set/subset? computers (connections other))
+            (conj computers other)))
+        (set/difference (set (keys connections)) computers)))
+
+(defn part-2-by-add-one
+  [connections]
+  (let [party (loop [largest (groups-of-three connections)]
+                (let [grown (set (mapcat (partial add-one connections) largest))]
+                  (if (empty? grown)
+                    largest
+                    (recur grown))))]
+    (str/join "," (sort party))))
+
+;; We can't start from the most connected computer and trim them down... because all the computers have the same number of connections.
+;;
+;; So we'll walk through all of the computers and see how many of their
+;; connections are interconnected.
+(defn largest-group-from
+  [connections computer]
+  (loop [possible (connections computer)
+         found (set [computer])]
+    (let [[to-test & remaining] possible]
+      (cond
+        (nil? to-test)
+        found
+
+        (set/subset? found (connections to-test))
+        (recur remaining (conj found to-test))
+
+        :else
+        (recur remaining found)))))
 
 (defn part-2
   [connections]
-  (println "Part 2"))
+  (->> connections
+       keys
+       (map (partial largest-group-from connections))
+       (apply max-key count)
+       sort
+       (str/join ",")))
 
 ;; Which gives our answer for the test input
 {:nextjournal.clerk/visibility {:code :hide :result :show}}
-(part-2 input)
+(part-2 test-input)
 
 ;; And with the full input
 (part-2 input)
