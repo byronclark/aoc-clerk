@@ -107,13 +107,3 @@
 
 ;; And the full input
 (part-1 input)
-
-{:nextjournal.clerk/visibility {:code :show :result :hide}}
-;; ## Part 2
-(defn part-2
-  [input]
-  (println "Part 2"))
-
-;; Which gives our answer
-{:nextjournal.clerk/visibility {:code :hide :result :show}}
-(part-2 input)
